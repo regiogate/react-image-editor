@@ -9,6 +9,17 @@
 
 export { ImageEditor, type ImageEditorProps } from './ui/ImageEditor';
 
+// Internationalisation — built-in `en` / `de` messages plus helpers for hosts
+// that want to add languages or share their own i18next instance.
+export {
+  ASP_BUILTIN_MESSAGES,
+  ASP_NAMESPACE,
+  createEditorI18n,
+  registerEditorMessages,
+  type AspMessageOverrides,
+  type AspMessages,
+} from './i18n';
+
 // Modal dialog — open the basic editor and await a Blob (or null on cancel).
 export {
   openImageEditorDialog,

@@ -6,7 +6,16 @@ import {
   type ChangeEvent,
   type ReactElement,
 } from 'react';
+import type { i18n as I18n } from 'i18next';
+import { I18nextProvider } from 'react-i18next';
 
+import {
+  createEditorI18n,
+  getFallbackEditorI18n,
+  registerEditorMessages,
+  type AspMessageOverrides,
+} from '../i18n';
+import { useAspT } from '../i18n/use-asp-t';
 import { type ArtboardSize } from '../engine/editor-engine';
 import { type AspBackgroundRemovalLoader, type AspHeicDecoderLoader } from '../engine/loaders';
 import { applyTheme } from '../theme/apply-theme';
@@ -102,8 +111,21 @@ export interface ImageEditorProps {
   readonly baseColor?: string;
   readonly accentColor?: string;
   readonly themeMode?: AspThemeMode;
-  /** Heading shown by the `basic` modal layout. */
+  /** Heading shown by the `basic` modal layout (defaults to the translated "Edit image"). */
   readonly heading?: string;
+  /**
+   * UI language (BCP 47, e.g. `'de'`, `'en'`). Ships with `en` and `de`; add or
+   * adjust languages via `messages`. Ignored when `i18n` is provided (the host
+   * instance decides the language). Defaults to `'en'`.
+   */
+  readonly locale?: string;
+  /** Extra languages or per-string overrides, keyed by language code. */
+  readonly messages?: AspMessageOverrides;
+  /**
+   * Use the host app's i18next instance instead of the editor's own. The
+   * editor registers its bundles under the `imageEditor` namespace.
+   */
+  readonly i18n?: I18n;
   /** Show the edit-history panel in the workspace (hosts that don't want it set false). */
   readonly showHistory?: boolean;
   /** Enable keyboard shortcuts while the pointer is over the editor. */
@@ -142,7 +164,7 @@ export interface ImageEditorProps {
  * children (rail, options panel, history, layers) render data and emit intent;
  * this container is the only place that drives the engine.
  */
-export function ImageEditor({
+function ImageEditorInner({
   src = null,
   mode = 'advanced',
   width = null,
@@ -159,7 +181,7 @@ export function ImageEditor({
   baseColor = FALLBACK_BASE,
   accentColor = FALLBACK_ACCENT,
   themeMode = 'light',
-  heading = 'Edit image',
+  heading,
   showHistory = true,
   keyboardEnabled = true,
   fonts = DEFAULT_FONTS,
@@ -171,6 +193,7 @@ export function ImageEditor({
   onExported,
   onError,
 }: ImageEditorProps): ReactElement {
+  const t = useAspT();
   const hostRef = useRef<HTMLDivElement>(null);
 
   const binding = useEditorController({
@@ -265,10 +288,10 @@ export function ImageEditor({
   // Under the neutral Select tool, title the panel by what's selected.
   const toolTitle =
     state.activeTool === 'select' && state.selectionKind === 'text'
-      ? 'Text'
+      ? t('editor.selectionText')
       : state.activeTool === 'select' && state.selectionKind === 'stroke'
-        ? 'Object'
-        : (activeToolMeta?.label ?? '');
+        ? t('editor.selectionObject')
+        : (activeToolMeta ? t(`tools.${activeToolMeta.key}`, { defaultValue: activeToolMeta.label }) : '');
   const zoomLabel = `${state.zoomPct}%`;
   const layout: 'workspace' | 'basic' | 'viewer' =
     mode === 'basic' ? 'basic' : mode === 'viewer' ? 'viewer' : 'workspace';
@@ -319,7 +342,7 @@ export function ImageEditor({
           <button
             type="button"
             className="asp-toast__close"
-            aria-label="Dismiss"
+            aria-label={t('common.dismiss')}
             onClick={() => controller.dismissErrorToast()}
           >
             <AspIcon name="x" size={15} />
@@ -342,8 +365,8 @@ export function ImageEditor({
                 type="button"
                 className="asp-iconbtn"
                 disabled={!state.canUndo}
-                title="Undo"
-                aria-label="Undo"
+                title={t('editor.undo')}
+                aria-label={t('editor.undo')}
                 onClick={() => void controller.undo()}
               >
                 <AspIcon name="undo-2" size={17} />
@@ -352,8 +375,8 @@ export function ImageEditor({
                 type="button"
                 className="asp-iconbtn"
                 disabled={!state.canRedo}
-                title="Redo"
-                aria-label="Redo"
+                title={t('editor.redo')}
+                aria-label={t('editor.redo')}
                 onClick={() => void controller.redo()}
               >
                 <AspIcon name="redo-2" size={17} />
@@ -363,8 +386,8 @@ export function ImageEditor({
               <button
                 type="button"
                 className="asp-iconbtn"
-                title="Fit to screen"
-                aria-label="Fit to screen"
+                title={t('editor.fitToScreen')}
+                aria-label={t('editor.fitToScreen')}
                 onClick={() => controller.fitToScreen()}
               >
                 <AspIcon name="scaling" size={16} />
@@ -373,8 +396,8 @@ export function ImageEditor({
                 type="button"
                 className={state.snapEnabled ? 'asp-iconbtn asp-iconbtn--on' : 'asp-iconbtn'}
                 aria-pressed={state.snapEnabled}
-                title={state.snapEnabled ? 'Snapping on' : 'Snapping off'}
-                aria-label="Toggle snapping"
+                title={state.snapEnabled ? t('editor.snappingOn') : t('editor.snappingOff')}
+                aria-label={t('editor.toggleSnapping')}
                 onClick={() => controller.toggleSnap()}
               >
                 <AspIcon name="magnet" size={16} />
@@ -383,8 +406,8 @@ export function ImageEditor({
                 type="button"
                 className={state.rulersEnabled ? 'asp-iconbtn asp-iconbtn--on' : 'asp-iconbtn'}
                 aria-pressed={state.rulersEnabled}
-                title={state.rulersEnabled ? 'Rulers & guides on' : 'Rulers & guides off'}
-                aria-label="Toggle rulers and guides"
+                title={state.rulersEnabled ? t('editor.rulersOn') : t('editor.rulersOff')}
+                aria-label={t('editor.toggleRulers')}
                 onClick={() => controller.toggleRulers()}
               >
                 <AspIcon name="ruler" size={16} />
@@ -394,8 +417,8 @@ export function ImageEditor({
                   <button
                     type="button"
                     className="asp-iconbtn"
-                    title="History"
-                    aria-label="Edit history"
+                    title={t('editor.history')}
+                    aria-label={t('editor.editHistory')}
                     onClick={() => controller.toggleHistory()}
                   >
                     <AspIcon name="history" size={17} />
@@ -405,7 +428,7 @@ export function ImageEditor({
                       <button
                         type="button"
                         className="asp-pop__scrim"
-                        aria-label="Close history"
+                        aria-label={t('editor.closeHistory')}
                         onClick={() => controller.toggleHistory()}
                       ></button>
                       <div className="asp-menu asp-menu--history">
@@ -433,8 +456,8 @@ export function ImageEditor({
                   <button
                     type="button"
                     className="asp-ruler-corner"
-                    title="Clear all guides"
-                    aria-label="Clear all guides"
+                    title={t('editor.clearGuides')}
+                    aria-label={t('editor.clearGuides')}
                     onClick={() => controller.clearGuides()}
                   ></button>
                   <canvas
@@ -592,11 +615,11 @@ export function ImageEditor({
       {layout === 'basic' && (
         <div className="asp-basic asp-card">
           <div className="asp-basic__head">
-            <div className="asp-basic__title">{heading}</div>
+            <div className="asp-basic__title">{heading ?? t('editor.heading')}</div>
             <button
               type="button"
               className="asp-iconbtn-plain"
-              aria-label="Close"
+              aria-label={t('common.close')}
               onClick={() => controller.cancel()}
             >
               <AspIcon name="x" size={19} />
@@ -610,12 +633,12 @@ export function ImageEditor({
 
             {state.cropActive && (
               <p className="asp-basic__hint">
-                Drag the photo to reposition · use the slider to zoom
+                {t('editor.basicHint')}
               </p>
             )}
 
             <div>
-              <div className="asp-section-label">Aspect ratio</div>
+              <div className="asp-section-label">{t('editor.aspectRatio')}</div>
               <div className="asp-chip-row">
                 {aspectPresets.map((preset) => (
                   <button
@@ -628,7 +651,7 @@ export function ImageEditor({
                     }
                     onClick={() => controller.selectCrop(preset)}
                   >
-                    {preset === 'free' ? 'Free' : preset === 'original' ? 'Original' : preset}
+                    {preset === 'free' ? t('common.free') : preset === 'original' ? t('common.original') : preset}
                   </button>
                 ))}
                 {aspectRatios.map((option) => (
@@ -652,7 +675,7 @@ export function ImageEditor({
               <button
                 type="button"
                 className="asp-iconbtn"
-                title="Rotate left"
+                title={t('editor.rotateLeft')}
                 onClick={() => controller.rotate(-90)}
               >
                 <AspIcon name="rotate-ccw" size={17} />
@@ -660,7 +683,7 @@ export function ImageEditor({
               <button
                 type="button"
                 className="asp-iconbtn"
-                title="Rotate right"
+                title={t('editor.rotateRight')}
                 onClick={() => controller.rotate(90)}
               >
                 <AspIcon name="rotate-cw" size={17} />
@@ -668,7 +691,7 @@ export function ImageEditor({
               <button
                 type="button"
                 className="asp-iconbtn"
-                title="Flip"
+                title={t('editor.flip')}
                 onClick={() => controller.flip('h')}
               >
                 <AspIcon name="flip-horizontal-2" size={17} />
@@ -682,11 +705,11 @@ export function ImageEditor({
                   max={300}
                   value={state.zoomPct}
                   onChange={(event) => controller.onZoomSlider(Number(event.currentTarget.value))}
-                  aria-label="Zoom"
+                  aria-label={t('editor.zoom')}
                 />
               </div>
               <label className="asp-upload asp-upload--inline">
-                <AspIcon name="upload" size={15} /> Replace
+                <AspIcon name="upload" size={15} /> {t('common.replace')}
                 <input type="file" accept="image/*" onChange={onUploadInput} />
               </label>
             </div>
@@ -694,10 +717,10 @@ export function ImageEditor({
 
           <div className="asp-basic__foot">
             <button type="button" className="asp-btn-line" onClick={() => controller.cancel()}>
-              Cancel
+              {t('common.cancel')}
             </button>
             <button type="button" className="asp-btn-accent" onClick={() => void controller.save()}>
-              Save
+              {t('common.save')}
             </button>
           </div>
         </div>
@@ -715,13 +738,14 @@ function ZoomControl({
   binding: EditorBinding;
   zoomLabel: string;
 }): ReactElement {
+  const t = useAspT();
   const { controller } = binding;
   return (
     <div className="asp-zoom">
       <button
         type="button"
         className="asp-zoom__btn"
-        aria-label="Zoom out"
+        aria-label={t('editor.zoomOut')}
         onClick={() => controller.zoomOut()}
       >
         <AspIcon name="minus" size={15} />
@@ -730,7 +754,7 @@ function ZoomControl({
       <button
         type="button"
         className="asp-zoom__btn"
-        aria-label="Zoom in"
+        aria-label={t('editor.zoomIn')}
         onClick={() => controller.zoomIn()}
       >
         <AspIcon name="plus" size={15} />
@@ -746,6 +770,7 @@ function ImageMenu({
   binding: EditorBinding;
   onUploadInput: (event: ChangeEvent<HTMLInputElement>) => void;
 }): ReactElement {
+  const t = useAspT();
   const { controller, state } = binding;
 
   const onAddImageLayer = (event: ChangeEvent<HTMLInputElement>): void => {
@@ -773,18 +798,18 @@ function ImageMenu({
         className="asp-btn-line asp-topbtn"
         onClick={() => controller.togglePicker()}
       >
-        <AspIcon name="image-plus" size={16} /> Image
+        <AspIcon name="image-plus" size={16} /> {t('editor.image')}
       </button>
       {state.pickerOpen && (
         <>
           <button
             type="button"
             className="asp-pop__scrim"
-            aria-label="Close image menu"
+            aria-label={t('editor.closeImageMenu')}
             onClick={() => controller.togglePicker()}
           ></button>
           <div className="asp-menu asp-menu--right">
-            <div className="asp-menu__title">Sample images</div>
+            <div className="asp-menu__title">{t('editor.sampleImages')}</div>
             <div className="asp-sample-grid">
               {state.samples.map((sample) => (
                 <button
@@ -792,31 +817,31 @@ function ImageMenu({
                   type="button"
                   className="asp-sample"
                   style={{ backgroundImage: `url(${sample.dataUrl})` }}
-                  title={sample.label}
-                  aria-label={sample.label}
+                  title={t(`gradients.${sample.key}`, { defaultValue: sample.label })}
+                  aria-label={t(`gradients.${sample.key}`, { defaultValue: sample.label })}
                   onClick={() => void controller.pickSample(sample)}
                 ></button>
               ))}
             </div>
             <label className="asp-upload">
-              <AspIcon name="upload" size={15} /> Replace canvas image
+              <AspIcon name="upload" size={15} /> {t('editor.replaceCanvasImage')}
               <input type="file" accept="image/*" onChange={onUploadInput} />
             </label>
             <label className="asp-upload asp-mt-sm">
-              <AspIcon name="image-plus" size={15} /> Add image as a layer
+              <AspIcon name="image-plus" size={15} /> {t('editor.addImageLayer')}
               <input type="file" accept="image/*" onChange={onAddImageLayer} />
             </label>
             <div className="asp-menu__divider"></div>
-            <div className="asp-menu__title">Template</div>
+            <div className="asp-menu__title">{t('editor.template')}</div>
             <button
               type="button"
               className="asp-upload asp-upload--btn"
               onClick={() => controller.saveTemplate()}
             >
-              <AspIcon name="download" size={15} /> Save template
+              <AspIcon name="download" size={15} /> {t('editor.saveTemplate')}
             </button>
             <label className="asp-upload">
-              <AspIcon name="upload" size={15} /> Load template
+              <AspIcon name="upload" size={15} /> {t('editor.loadTemplate')}
               <input type="file" accept="application/json,.json" onChange={onLoadTemplate} />
             </label>
           </div>
@@ -828,66 +853,56 @@ function ImageMenu({
 
 function ExportMenu({
   binding,
-  exportFormats,
-}: {
+                    }: {
   binding: EditorBinding;
   exportFormats: readonly AspExportFormat[];
 }): ReactElement {
-  const { controller, state } = binding;
+  const t = useAspT();
+  const { controller } = binding;
   return (
-    <div className="asp-pop">
-      <button
-        type="button"
-        className="asp-btn-accent asp-topbtn"
-        onClick={() => controller.toggleExport()}
-      >
-        <AspIcon name="download" size={16} /> Export
-      </button>
-      {state.exportOpen && (
-        <>
-          <button
-            type="button"
-            className="asp-pop__scrim"
-            aria-label="Close export menu"
-            onClick={() => controller.toggleExport()}
-          ></button>
-          <div className="asp-menu asp-menu--right asp-menu--export">
-            <div className="asp-menu__label">Format</div>
-            <div className="asp-fmt-row">
-              {exportFormats.map((fmt) => (
-                <button
-                  key={fmt}
-                  type="button"
-                  className={state.exportFormat === fmt ? 'asp-fmt asp-fmt--active' : 'asp-fmt'}
-                  onClick={() => controller.setExportFormat(fmt)}
-                >
-                  {fmt.toUpperCase()}
-                </button>
-              ))}
-            </div>
-            <div className="asp-menu__row">
-              <span className="asp-menu__label">Quality</span>
-              <span className="asp-menu__value">{state.exportQ}</span>
-            </div>
-            <input
-              type="range"
-              className="asp-range"
-              min={10}
-              max={100}
-              value={state.exportQ}
-              onChange={(event) => controller.setExportQuality(Number(event.currentTarget.value))}
-              aria-label="Export quality"
-            />
-            <button
-              type="button"
-              className="asp-btn-accent asp-download"
-              onClick={() => void controller.download()}
-            >
-              Download image
-            </button>
-          </div>
-        </>
-      )}
-    </div>
+      <>
+        <button type="button" className="asp-btn-line" onClick={() => controller.cancel()}>
+          {t('common.cancel')}
+        </button>
+        <button type="button" className="asp-btn-accent" onClick={() => void controller.save()}>
+            {t('common.save')}
+        </button>
+      </>
+  );
+}
+
+/**
+ * The image editor. Provides an isolated i18next instance (see the `locale`,
+ * `messages` and `i18n` props) and renders the workspace inside it.
+ */
+export function ImageEditor(props: ImageEditorProps): ReactElement {
+  const { locale = 'en', messages, i18n: hostI18n } = props;
+  const [ownI18n] = useState<I18n | null>(() =>
+    hostI18n ? null : createEditorI18n(locale, messages),
+  );
+  const instance = hostI18n ?? ownI18n ?? getFallbackEditorI18n();
+
+  // Bundles must exist before the first render of a host-provided instance.
+  const registeredRef = useRef<I18n | null>(null);
+  if (hostI18n && registeredRef.current !== hostI18n) {
+    registerEditorMessages(hostI18n, messages);
+    registeredRef.current = hostI18n;
+  }
+
+  useEffect(() => {
+    registerEditorMessages(instance, messages);
+  }, [instance, messages]);
+
+  useEffect(() => {
+    // A host-provided instance owns its language; only drive our own.
+    if (!hostI18n && instance.language !== locale) {
+      void instance.changeLanguage(locale);
+    }
+  }, [hostI18n, instance, locale]);
+
+  return (
+    <I18nextProvider i18n={instance}>
+      <ImageEditorInner {...props} />
+    </I18nextProvider>
   );
 }

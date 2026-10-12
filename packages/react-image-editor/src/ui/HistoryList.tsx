@@ -2,6 +2,8 @@ import { useState, type ReactElement } from 'react';
 
 import { type HistoryStep } from '../engine/delta-history';
 import { AspIcon } from '../icons/AspIcon';
+import { translateHistoryLabel } from '../i18n/labels';
+import { useAspT } from '../i18n/use-asp-t';
 
 export interface AspHistoryListProps {
   readonly entries: readonly HistoryStep[];
@@ -14,6 +16,7 @@ export interface AspHistoryListProps {
  * branch ahead of the cursor. The user can collapse it via the header chevron.
  */
 export function AspHistoryList({ entries, currentIndex }: AspHistoryListProps): ReactElement {
+  const t = useAspT();
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -24,7 +27,7 @@ export function AspHistoryList({ entries, currentIndex }: AspHistoryListProps): 
         aria-expanded={!collapsed}
         onClick={() => setCollapsed((v) => !v)}
       >
-        <span className="asp-history__title">History</span>
+        <span className="asp-history__title">{t('history.title')}</span>
         <AspIcon name={collapsed ? 'plus' : 'minus'} size={14} />
       </button>
       {!collapsed && (
@@ -41,7 +44,7 @@ export function AspHistoryList({ entries, currentIndex }: AspHistoryListProps): 
                 .join(' ')}
             >
               <AspIcon name="dot" size={16} />
-              <span className="asp-history__label">{entry.label}</span>
+              <span className="asp-history__label">{translateHistoryLabel(t, entry.label)}</span>
             </div>
           ))}
         </div>

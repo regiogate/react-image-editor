@@ -10,6 +10,8 @@ import {
 
 import { type LayerInfo } from '../engine/editor-engine';
 import { AspIcon } from '../icons/AspIcon';
+import { translateLayerName } from '../i18n/labels';
+import { useAspT } from '../i18n/use-asp-t';
 
 export type AlignMode = 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom';
 
@@ -76,6 +78,7 @@ export function AspLayerList({
   onReorderLayers,
   onRenameLayer,
 }: AspLayerListProps): ReactElement {
+  const t = useAspT();
   const hostRef = useRef<HTMLDivElement>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [alignOpen, setAlignOpen] = useState(false);
@@ -204,7 +207,7 @@ export function AspLayerList({
         aria-expanded={!collapsed}
         onClick={() => setCollapsed((v) => !v)}
       >
-        <span className="asp-layers__title">Layers</span>
+        <span className="asp-layers__title">{t('layers.title')}</span>
         <AspIcon name={collapsed ? 'chevron-up' : 'chevron-down'} size={15} />
       </button>
 
@@ -216,8 +219,8 @@ export function AspLayerList({
               <button
                 type="button"
                 className="asp-layers__op"
-                title="Group"
-                aria-label="Group selection"
+                title={t('layers.group')}
+                aria-label={t('layers.groupSelection')}
                 disabled={!hasSelection}
                 onClick={() => onGroupSelection()}
               >
@@ -226,8 +229,8 @@ export function AspLayerList({
               <button
                 type="button"
                 className="asp-layers__op"
-                title="Ungroup"
-                aria-label="Ungroup"
+                title={t('layers.ungroup')}
+                aria-label={t('layers.ungroup')}
                 disabled={!hasSelection}
                 onClick={() => onUngroupSelection()}
               >
@@ -237,8 +240,8 @@ export function AspLayerList({
                 <button
                   type="button"
                   className="asp-layers__op"
-                  title="Align"
-                  aria-label="Align"
+                  title={t('layers.align')}
+                  aria-label={t('layers.align')}
                   aria-expanded={alignOpen}
                   disabled={!hasSelection}
                   onClick={() => setAlignOpen((v) => !v)}
@@ -250,27 +253,27 @@ export function AspLayerList({
                     <button
                       type="button"
                       className="asp-layers__scrim"
-                      aria-label="Close"
+                      aria-label={t('common.close')}
                       onClick={() => setAlignOpen(false)}
                     ></button>
                     <div className="asp-layers__alignmenu" role="menu">
                       <button type="button" role="menuitem" onClick={() => emitAlign('left')}>
-                        Left
+                        {t('layers.alignLeft')}
                       </button>
                       <button type="button" role="menuitem" onClick={() => emitAlign('center-h')}>
-                        Center
+                        {t('layers.alignCenter')}
                       </button>
                       <button type="button" role="menuitem" onClick={() => emitAlign('right')}>
-                        Right
+                        {t('layers.alignRight')}
                       </button>
                       <button type="button" role="menuitem" onClick={() => emitAlign('top')}>
-                        Top
+                        {t('layers.alignTop')}
                       </button>
                       <button type="button" role="menuitem" onClick={() => emitAlign('center-v')}>
-                        Middle
+                        {t('layers.alignMiddle')}
                       </button>
                       <button type="button" role="menuitem" onClick={() => emitAlign('bottom')}>
-                        Bottom
+                        {t('layers.alignBottom')}
                       </button>
                     </div>
                   </>
@@ -279,8 +282,8 @@ export function AspLayerList({
               <button
                 type="button"
                 className="asp-layers__op"
-                title="Duplicate"
-                aria-label="Duplicate"
+                title={t('layers.duplicate')}
+                aria-label={t('layers.duplicate')}
                 disabled={!hasSelection}
                 onClick={() => onDuplicateSelection()}
               >
@@ -289,8 +292,8 @@ export function AspLayerList({
               <button
                 type="button"
                 className="asp-layers__op asp-layers__op--danger"
-                title="Delete"
-                aria-label="Delete"
+                title={t('layers.delete')}
+                aria-label={t('layers.delete')}
                 disabled={!hasSelection}
                 onClick={() => onDeleteSelection()}
               >
@@ -299,7 +302,7 @@ export function AspLayerList({
             </div>
 
             <div className="asp-layers__opacity">
-              <span className="asp-layers__opacity-label">Opacity</span>
+              <span className="asp-layers__opacity-label">{t('layers.opacity')}</span>
               <input
                 type="range"
                 className="asp-range"
@@ -311,7 +314,7 @@ export function AspLayerList({
                 onPointerUp={(event) => commitOpacity(event.currentTarget.value)}
                 onKeyUp={(event) => commitOpacity(event.currentTarget.value)}
                 onBlur={(event) => commitOpacity(event.currentTarget.value)}
-                aria-label="Layer opacity"
+                aria-label={t('layers.layerOpacity')}
               />
               <span className="asp-layers__opacity-value">{opacityPct}</span>
             </div>
@@ -336,7 +339,7 @@ export function AspLayerList({
                 onDrop={(event) => onDrop(layer.id, event)}
                 onDragEnd={clearDragState}
               >
-                <span className="asp-layers__grip" aria-hidden="true" title="Drag to reorder">
+                <span className="asp-layers__grip" aria-hidden="true" title={t('layers.dragToReorder')}>
                   <AspIcon name="grip-vertical" size={14} />
                 </span>
                 {editingId === layer.id ? (
@@ -347,7 +350,7 @@ export function AspLayerList({
                     onChange={(event) => setEditValue(event.currentTarget.value)}
                     onKeyDown={(event) => onRenameKeydown(layer, event)}
                     onBlur={() => commitRename(layer)}
-                    aria-label="Layer name"
+                    aria-label={t('layers.layerName')}
                   />
                 ) : (
                   <button
@@ -357,17 +360,17 @@ export function AspLayerList({
                     onClick={(event) => onSelect(layer.id, event)}
                     onDoubleClick={() => startRename(layer)}
                     aria-pressed={layer.selected}
-                    title="Click to select · double-click to rename"
+                    title={t('layers.clickToSelect')}
                   >
-                    {layer.label}
+                    {translateLayerName(t, layer.label)}
                   </button>
                 )}
                 <div className="asp-layers__actions">
                   <button
                     type="button"
                     className="asp-layers__btn"
-                    title={layer.visible ? 'Hide' : 'Show'}
-                    aria-label={layer.visible ? 'Hide layer' : 'Show layer'}
+                    title={layer.visible ? t('layers.hide') : t('layers.show')}
+                    aria-label={layer.visible ? t('layers.hideLayer') : t('layers.showLayer')}
                     onClick={() => onToggleVisible(layer.id)}
                   >
                     <AspIcon name={layer.visible ? 'eye' : 'eye-off'} size={15} />
@@ -377,8 +380,8 @@ export function AspLayerList({
                     className={
                       layer.locked ? 'asp-layers__btn asp-layers__btn--on' : 'asp-layers__btn'
                     }
-                    title={layer.locked ? 'Unlock' : 'Lock'}
-                    aria-label={layer.locked ? 'Unlock layer' : 'Lock layer'}
+                    title={layer.locked ? t('layers.unlock') : t('layers.lock')}
+                    aria-label={layer.locked ? t('layers.unlockLayer') : t('layers.lockLayer')}
                     onClick={() => onToggleLock(layer.id)}
                   >
                     <AspIcon name={layer.locked ? 'lock' : 'lock-open'} size={15} />
@@ -386,8 +389,8 @@ export function AspLayerList({
                   <button
                     type="button"
                     className="asp-layers__btn"
-                    title="Bring forward"
-                    aria-label="Bring forward"
+                    title={t('layers.bringForward')}
+                    aria-label={t('layers.bringForward')}
                     onClick={() => onMoveUp(layer.id)}
                   >
                     <AspIcon name="chevron-up" size={15} />
@@ -395,8 +398,8 @@ export function AspLayerList({
                   <button
                     type="button"
                     className="asp-layers__btn"
-                    title="Send backward"
-                    aria-label="Send backward"
+                    title={t('layers.sendBackward')}
+                    aria-label={t('layers.sendBackward')}
                     onClick={() => onMoveDown(layer.id)}
                   >
                     <AspIcon name="chevron-down" size={15} />

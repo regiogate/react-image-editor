@@ -1,6 +1,7 @@
 import { useState, type MouseEvent, type ReactElement } from 'react';
 
 import { AspIcon } from '../icons/AspIcon';
+import { useAspT } from '../i18n/use-asp-t';
 import { TOOL_REGISTRY } from '../registry/tool-registry';
 import { type ResolvedGroup } from '../registry/toolbar-groups';
 import { type AspTool } from '../types/editor.types';
@@ -24,6 +25,9 @@ export function AspToolRail({
   activeMembers = {},
   onToolSelect,
 }: AspToolRailProps): ReactElement {
+  const t = useAspT();
+  const groupLabel = (group: ResolvedGroup): string =>
+    t(`groups.${group.id}`, { defaultValue: group.label });
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   /** Fixed-position coords for the open flyout (the rail clips overflow). */
   const [flyoutPos, setFlyoutPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
@@ -69,11 +73,11 @@ export function AspToolRail({
               isActive(group) ? 'asp-rail__tool asp-rail__tool--active' : 'asp-rail__tool'
             }
             aria-pressed={isActive(group)}
-            title={group.label}
+            title={groupLabel(group)}
             onClick={() => pick(activeMemberOf(group))}
           >
             <AspIcon name={TOOL_REGISTRY[activeMemberOf(group)].icon} size={21} />
-            <span className="asp-rail__label">{group.label}</span>
+            <span className="asp-rail__label">{groupLabel(group)}</span>
           </button>
 
           {hasFlyout(group) && (
@@ -85,9 +89,9 @@ export function AspToolRail({
                     ? 'asp-rail__flyout-toggle asp-rail__flyout-toggle--open'
                     : 'asp-rail__flyout-toggle'
                 }
-                aria-label={`${group.label} — more tools`}
+                aria-label={t('rail.moreToolsOf', { group: groupLabel(group) })}
                 aria-expanded={openGroup === group.id}
-                title="More tools"
+                title={t('rail.moreTools')}
                 onClick={(event) => toggleFlyout(group.id, event)}
               ></button>
 
@@ -96,7 +100,7 @@ export function AspToolRail({
                   <button
                     type="button"
                     className="asp-rail__scrim"
-                    aria-label="Close"
+                    aria-label={t('common.close')}
                     onClick={() => setOpenGroup(null)}
                   ></button>
                   <div
@@ -117,7 +121,7 @@ export function AspToolRail({
                         onClick={() => pick(member)}
                       >
                         <AspIcon name={TOOL_REGISTRY[member].icon} size={17} />
-                        {TOOL_REGISTRY[member].label}
+                        {t(`tools.${member}`, { defaultValue: TOOL_REGISTRY[member].label })}
                       </button>
                     ))}
                   </div>

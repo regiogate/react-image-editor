@@ -418,6 +418,7 @@ export class EditorController {
   private async loadSource(source: string | Blob): Promise<void> {
     try {
       await this.engine?.loadImage(source);
+      this.patch({ artboard: this.engine?.getArtboard() ?? null });
       this.resetUiState();
       this.sync();
       this.applyInitialAspect();
@@ -841,8 +842,8 @@ export class EditorController {
   }
 
   /**
-   * Keep the active tool valid as the resolved set changes: default to Color
-   * (adjust) when available, else the first resolved tool.
+   * Keep the active tool valid as the resolved set changes: default to Select
+   * when available, then Color (adjust), else the first resolved tool.
    */
   ensureActiveTool(resolvedKeys: readonly AspTool[]): void {
     const current = this.state.activeTool;
@@ -851,7 +852,13 @@ export class EditorController {
         this.patch({ activeTool: null });
       }
     } else if (current === null || !resolvedKeys.includes(current)) {
-      this.patch({ activeTool: resolvedKeys.includes('adjust') ? 'adjust' : resolvedKeys[0] });
+      this.patch({
+        activeTool: resolvedKeys.includes('select')
+          ? 'select'
+          : resolvedKeys.includes('adjust')
+            ? 'adjust'
+            : resolvedKeys[0],
+      });
     }
   }
 
@@ -1177,6 +1184,10 @@ export class EditorController {
 
   rotate(deg: number): void {
     this.engine?.rotateBy(deg);
+    this.patch({
+      hasCropRegion: this.engine?.hasCropRegion() ?? false,
+      artboard: this.engine?.getArtboard() ?? null,
+    });
     this.sync();
   }
 

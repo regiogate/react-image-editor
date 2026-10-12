@@ -25,5 +25,15 @@
   },
   "overrides": {
     "esbuild": "^0.28.1"
+  },
+  "peerDependencies": {
+    "i18next": "^26.4.4",
+    "react-i18next": "^17.0.16"
+  },
+  "allowScripts": {
+    "@parcel/watcher@2.5.6": true,
+    "canvas@3.2.3": true,
+    "core-js@3.49.0": true,
+    "esbuild@0.28.1": true
   }
 }

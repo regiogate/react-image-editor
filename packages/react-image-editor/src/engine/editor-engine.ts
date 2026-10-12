@@ -244,6 +244,8 @@ export class EditorEngine {
   private snapEnabled = true;
   private activeGuides: GuideLine[] = [];
   private artboard: ArtboardSize | null = null;
+  /** True while the artboard mirrors the (rotated) image size instead of a user-chosen preset. */
+  private artboardAuto = false;
   /** Committed crop region (scene coords) — drives the dim mask and raster/PDF export. */
   private cropRegion: FrameRect | null = null;
   /** Host-requested pixel size for a cropped export; null = full source fidelity. */
@@ -440,9 +442,11 @@ export class EditorEngine {
     // context, redrawn after every render so they survive Fabric clearing the
     // overlay to repaint selection controls. Mask first, then guides on top.
     this.canvas.on('after:render', () => {
-      // Clear stale overlay paint first; during a drag Fabric does not clear the
-      // top context between renders, so the mask/thirds would otherwise smear.
-      if (this.cropFrame || this.imageCropActive) {
+      // Clear stale overlay paint first; Fabric does not clear the top context
+      // between renders (during a crop drag, nor on zoom/pan), so the
+      // mask/outline would otherwise smear or linger. Skip while free-drawing,
+      // where Fabric paints the live brush stroke on this context.
+      if (this.cropFrame || this.imageCropActive || !this.canvas.isDrawingMode) {
         this.clearOverlay();
       }
       this.drawArtboardMask();
@@ -951,10 +955,28 @@ export class EditorEngine {
    */
   setArtboard(size: ArtboardSize | null): void {
     this.artboard = size && size.width > 0 && size.height > 0 ? size : null;
+    this.artboardAuto = false;
     this.clearOverlay();
     // Render synchronously so the overlay (top) context is realized this frame
     // and the mask repaints immediately, rather than on a later deferred render.
     this.canvas.renderAll();
+  }
+
+  /**
+   * Set the artboard to the image's real pixel size (width/height swapped for
+   * 90°/270° rotations) and keep it following the image until a preset is chosen.
+   */
+  private syncArtboardToImage(): void {
+    const image = this.baseImage;
+    if (!image || !image.width || !image.height) {
+      return;
+    }
+    const quarterTurn = Math.round(this.rotation / 90) % 2 !== 0;
+    this.artboard = {
+      width: quarterTurn ? image.height : image.width,
+      height: quarterTurn ? image.width : image.height,
+    };
+    this.artboardAuto = true;
   }
 
   getArtboard(): ArtboardSize | null {
@@ -974,6 +996,41 @@ export class EditorEngine {
   }
 
   /**
+   * The crop frame a fresh session starts with: the image's on-canvas bounds
+   * (the artboard rect while it mirrors the image), reduced to `ratio` and
+   * centered. Falls back to the canvas-based default when there is no image.
+   */
+  private initialCropFrame(ratio: number | null): FrameRect {
+    const cw = this.canvas.getWidth();
+    const ch = this.canvas.getHeight();
+    const image = this.baseImage;
+    if (!image) {
+      return defaultCropFrame(cw, ch, ratio);
+    }
+    let bounds: FrameRect | null = this.artboardAuto && this.artboard ? this.artboardRect() : null;
+    if (!bounds) {
+      image.setCoords();
+      const b = image.getBoundingRect();
+      bounds = { left: b.left, top: b.top, width: b.width, height: b.height };
+    }
+    bounds = clampFrame(bounds, cw, ch);
+    let { width, height } = bounds;
+    if (ratio) {
+      if (width / height > ratio) {
+        width = height * ratio;
+      } else {
+        height = width / ratio;
+      }
+    }
+    return {
+      left: bounds.left + (bounds.width - width) / 2,
+      top: bounds.top + (bounds.height - height) / 2,
+      width,
+      height,
+    };
+  }
+
+  /**
    * Begin an interactive crop. Drops a draggable, resizable frame over the canvas
    * (rule-of-thirds + dimmed surroundings), starting from any existing crop region
    * or a centered default for the given aspect `ratio` (null = free). The rest of
@@ -988,7 +1045,7 @@ export class EditorEngine {
     this.cropRatio = ratio;
     const cw = this.canvas.getWidth();
     const ch = this.canvas.getHeight();
-    const start = applyRatio(this.cropRegion ?? defaultCropFrame(cw, ch, ratio), ratio, cw, ch);
+    const start = applyRatio(this.cropRegion ?? this.initialCropFrame(ratio), ratio, cw, ch);
 
     this.canvas.discardActiveObject();
     this.cropPrevState.clear();
@@ -1040,7 +1097,7 @@ export class EditorEngine {
     this.canvas.uniformScaling = ratio !== null;
     const cw = this.canvas.getWidth();
     const ch = this.canvas.getHeight();
-    const rect = applyRatio(this.cropFrameRect() ?? defaultCropFrame(cw, ch, ratio), ratio, cw, ch);
+    const rect = applyRatio(this.cropFrameRect() ?? this.initialCropFrame(ratio), ratio, cw, ch);
     f.set({ left: rect.left, top: rect.top, width: rect.width, height: rect.height, scaleX: 1, scaleY: 1 });
     this.applyCropControls(f, ratio);
     f.setCoords();
@@ -1339,11 +1396,16 @@ export class EditorEngine {
     const cw = this.canvas.getWidth();
     const ch = this.canvas.getHeight();
     const ar = this.artboard.width / this.artboard.height;
-    let width = cw;
-    let height = cw / ar;
-    if (height > ch) {
-      height = ch;
-      width = ch * ar;
+    // While the artboard mirrors the image, keep the same margin the image gets
+    // so the artboard outline stays visible inside the canvas.
+    const pad = this.artboardAuto ? FIT_PADDING : 1;
+    const maxW = cw * pad;
+    const maxH = ch * pad;
+    let width = maxW;
+    let height = maxW / ar;
+    if (height > maxH) {
+      height = maxH;
+      width = maxH * ar;
     }
     return { left: (cw - width) / 2, top: (ch - height) / 2, width, height };
   }
@@ -1585,9 +1647,11 @@ export class EditorEngine {
     this.frame = 'none';
     image.set({ selectable: false, evented: false, hasControls: false });
     image.set('aspId', 'base');
+    this.syncArtboardToImage();
     this.fitBaseImage();
     this.canvas.add(image);
     this.canvas.setZoom(1);
+    this.clearOverlay();
     this.canvas.requestRenderAll();
     this.history.reset('Opened image', this.snapshot());
   }
@@ -1605,7 +1669,11 @@ export class EditorEngine {
     const ch = this.canvas.getHeight();
     const iw = image.width ?? 1;
     const ih = image.height ?? 1;
-    const scale = Math.min(cw / iw, ch / ih) * FIT_PADDING;
+    // With an image-sized artboard the image fills the artboard rect exactly.
+    const autoRect = this.artboardAuto && this.artboard ? this.artboardRect() : null;
+    const scale = autoRect
+      ? autoRect.width / (this.artboard?.width ?? iw)
+      : Math.min(cw / iw, ch / ih) * FIT_PADDING;
     image.set({
       originX: 'center',
       originY: 'center',
@@ -1623,7 +1691,27 @@ export class EditorEngine {
   /** Rotate the image by a signed multiple of 90°. */
   rotateBy(deg: number): void {
     this.rotation = (((this.rotation + deg) % 360) + 360) % 360;
+    // A rotation invalidates any crop geometry: drop an applied crop region.
+    const discardCrop = !this.imageCropActive && this.cropRegion !== null;
+    if (discardCrop) {
+      this.cropRegion = null;
+    }
+    if (this.artboardAuto && (this.artboard || discardCrop)) {
+      this.syncArtboardToImage();
+      this.fitBaseImage();
+      this.clearOverlay();
+    }
     this.applyAngle();
+    // ...and reset a live crop frame to the rotated image's bounds.
+    const frame = this.cropFrame;
+    if (frame) {
+      const cw = this.canvas.getWidth();
+      const ch = this.canvas.getHeight();
+      const rect = applyRatio(this.initialCropFrame(this.cropRatio), this.cropRatio, cw, ch);
+      frame.set({ left: rect.left, top: rect.top, width: rect.width, height: rect.height, scaleX: 1, scaleY: 1 });
+      frame.setCoords();
+      this.canvas.requestRenderAll();
+    }
     this.commit(deg > 0 ? 'Rotate right' : 'Rotate left');
   }
 
@@ -2719,6 +2807,9 @@ export class EditorEngine {
     this.looks = new Set(composite.looks);
     this.frame = composite.frame;
     this.manualGuides = composite.guides ? [...composite.guides] : [];
+    if (this.artboardAuto && this.artboard) {
+      this.syncArtboardToImage();
+    }
     // Re-apply per-object lock state (serialized via aspLocked).
     for (const object of this.canvas.getObjects()) {
       if (object.get('aspLocked') === true) {

@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 
+import { type AspMessageOverrides } from '../i18n';
 import { type AspThemeMode } from '../theme/derive-theme';
 import { type AspAspectPreset, type AspExportFormat } from '../types/editor.types';
 import { ImageEditor } from '../ui/ImageEditor';
@@ -8,6 +9,10 @@ import { ImageEditor } from '../ui/ImageEditor';
 export interface OpenImageEditorConfig {
   readonly src?: string | Blob | null;
   readonly heading?: string;
+  /** UI language (`'en'` or `'de'` built in). */
+  readonly locale?: string;
+  /** Extra languages or per-string overrides, keyed by language code. */
+  readonly messages?: AspMessageOverrides;
   readonly baseColor?: string;
   readonly accentColor?: string;
   readonly themeMode?: AspThemeMode;
@@ -84,7 +89,9 @@ export function openImageEditorDialog(config: OpenImageEditorConfig = {}): Promi
       <ImageEditor
         mode="basic"
         src={config.src ?? null}
-        heading={config.heading ?? 'Edit image'}
+        {...(config.heading ? { heading: config.heading } : {})}
+        {...(config.locale ? { locale: config.locale } : {})}
+        {...(config.messages ? { messages: config.messages } : {})}
         baseColor={config.baseColor ?? '#f4f6f9'}
         accentColor={config.accentColor ?? '#1f6feb'}
         themeMode={config.themeMode ?? 'light'}

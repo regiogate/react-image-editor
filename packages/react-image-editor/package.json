@@ -51,7 +51,9 @@
   },
   "peerDependencies": {
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "i18next": "^26.4.4",
+    "react-i18next": "^17.0.16"
   },
   "dependencies": {
     "fabric": "^7.4.0",

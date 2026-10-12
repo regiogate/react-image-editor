@@ -1,6 +1,7 @@
 import { type ChangeEvent, type ReactElement, useId, useState } from 'react';
 
 import { AspIcon } from '../icons/AspIcon';
+import { useAspT } from '../i18n/use-asp-t';
 import { AspColorField } from './ColorField';
 import { type ArtboardSize, type RedactMode, type ShapeKind } from '../engine/editor-engine';
 import { type FilterMeta } from '../registry/tool-registry';
@@ -52,24 +53,26 @@ export const BACKGROUND_COLORS: readonly string[] = [
 
 /** A named artboard / output-size preset. */
 export interface ArtboardPreset {
+  /** Stable id used to look up the translated label. */
+  readonly key?: string;
   readonly label: string;
   readonly size: ArtboardSize;
 }
 
 /** Common social / CMS output sizes offered in the Canvas panel. */
 export const ARTBOARD_PRESETS: readonly ArtboardPreset[] = [
-  { label: 'Square 1080', size: { width: 1080, height: 1080 } },
-  { label: 'Portrait 4:5', size: { width: 1080, height: 1350 } },
-  { label: 'Story 9:16', size: { width: 1080, height: 1920 } },
-  { label: 'HD 16:9', size: { width: 1920, height: 1080 } },
-  { label: 'OG 1200×630', size: { width: 1200, height: 630 } },
+  { key: 'square', label: 'Square 1080', size: { width: 1080, height: 1080 } },
+  { key: 'portrait', label: 'Portrait 4:5', size: { width: 1080, height: 1350 } },
+  { key: 'story', label: 'Story 9:16', size: { width: 1080, height: 1920 } },
+  { key: 'hd', label: 'HD 16:9', size: { width: 1920, height: 1080 } },
+  { key: 'og', label: 'OG 1200×630', size: { width: 1200, height: 630 } },
 ];
 
 /** Named linear-gradient background presets. */
-export const BACKGROUND_GRADIENTS: readonly { label: string; colors: string[] }[] = [
-  { label: 'Sunset', colors: ['#f59e0b', '#ec4899', '#7c3aed'] },
-  { label: 'Ocean', colors: ['#0ea5e9', '#2563eb', '#1e3a8a'] },
-  { label: 'Forest', colors: ['#84cc16', '#15803d', '#064e3b'] },
+export const BACKGROUND_GRADIENTS: readonly { key?: string; label: string; colors: string[] }[] = [
+  { key: 'sunset', label: 'Sunset', colors: ['#f59e0b', '#ec4899', '#7c3aed'] },
+  { key: 'ocean', label: 'Ocean', colors: ['#0ea5e9', '#2563eb', '#1e3a8a'] },
+  { key: 'forest', label: 'Forest', colors: ['#84cc16', '#15803d', '#064e3b'] },
 ];
 
 export interface AdjustChange {
@@ -292,7 +295,10 @@ export function AspOptionsPanel({
   onSetBackgroundImageFile,
   onArtboardChange,
 }: AspOptionsPanelProps): ReactElement {
-  const [textValue, setTextValue] = useState('Add a label');
+  const t = useAspT();
+  const filterLabel = (def: FilterMeta): string =>
+    t(`filters.${def.key}`, { defaultValue: def.label });
+  const [textValue, setTextValue] = useState(() => t('panel.text.defaultValue'));
   const [customFontValue, setCustomFontValue] = useState('');
   const [customW, setCustomW] = useState('1080');
   const [customH, setCustomH] = useState('1080');
@@ -353,12 +359,12 @@ export function AspOptionsPanel({
     activeTool === 'shapes' || (activeTool === 'select' && selectionKind === 'stroke');
   const isRedact = activeTool === 'redact';
   /** Label for the AI action button, by which AI tool is active. */
-  const aiActionLabel = activeTool === 'selectsubject' ? 'Cut out subject' : 'Remove background';
+  const aiActionLabel = activeTool === 'selectsubject' ? t('tools.selectsubject') : t('tools.removebg');
   const aiPercent = Math.round(aiProgress * 100);
   /** Whether the panel is reflecting a selection rather than an active tool. */
   const fromSelection = activeTool === 'select';
 
-  const strokeLabel = isText ? 'Font size' : 'Thickness';
+  const strokeLabel = isText ? t('panel.draw.fontSize') : t('panel.draw.thickness');
   const sizeValue = isText ? fontSize : annotationWidth;
   const sizeMin = isText ? 8 : 1;
   const sizeMax = isText ? 120 : 48;
@@ -396,7 +402,7 @@ export function AspOptionsPanel({
 
   const handleAddText = (): void => {
     const text = textValue.trim();
-    onAddText?.(text.length > 0 ? text : 'Text');
+    onAddText?.(text.length > 0 ? text : t('panel.text.fallback'));
   };
 
   const handleBackgroundImage = (event: ChangeEvent<HTMLInputElement>): void => {
@@ -413,7 +419,7 @@ export function AspOptionsPanel({
       <div className="asp-panel__head">
         <div className="asp-panel__title">{toolTitle}</div>
         <button type="button" className="asp-panel__reset" onClick={() => onResetRequested?.()}>
-          <AspIcon name="rotate-ccw" size={13} /> Reset
+          <AspIcon name="rotate-ccw" size={13} /> {t('common.reset')}
         </button>
       </div>
 
@@ -426,14 +432,14 @@ export function AspOptionsPanel({
                 className={`asp-tab${!isColorFilters ? ' asp-tab--active' : ''}`}
                 onClick={() => onRequestTool?.('adjust')}
               >
-                Adjust
+                {t('tools.adjust')}
               </button>
               <button
                 type="button"
                 className={`asp-tab${isColorFilters ? ' asp-tab--active' : ''}`}
                 onClick={() => onRequestTool?.('filters')}
               >
-                Filters
+                {t('tools.filters')}
               </button>
             </div>
 
@@ -442,7 +448,7 @@ export function AspOptionsPanel({
                 {adjustmentDefs.map((def) => (
                   <div key={def.key}>
                     <div className="asp-field-row">
-                      <span className="asp-field-label">{def.label}</span>
+                      <span className="asp-field-label">{filterLabel(def)}</span>
                       <span className="asp-field-value">{displayValue(def)}</span>
                     </div>
                     <input
@@ -463,7 +469,7 @@ export function AspOptionsPanel({
                       onBlur={(event) =>
                         onAdjustCommit?.({ key: def.key, value: Number(event.currentTarget.value) })
                       }
-                      aria-label={def.label}
+                      aria-label={filterLabel(def)}
                     />
                   </div>
                 ))}
@@ -476,7 +482,7 @@ export function AspOptionsPanel({
                   onClick={() => onSelectLook?.(null)}
                 >
                   <span className="asp-filter__thumb asp-filter__thumb--none"></span>
-                  <span className="asp-filter__label">Original</span>
+                  <span className="asp-filter__label">{t('common.original')}</span>
                 </button>
                 {lookDefs.map((def) => (
                   <button
@@ -486,7 +492,7 @@ export function AspOptionsPanel({
                     onClick={() => onSelectLook?.(def.key)}
                   >
                     <span className="asp-filter__thumb" data-look={def.key}></span>
-                    <span className="asp-filter__label">{def.label}</span>
+                    <span className="asp-filter__label">{filterLabel(def)}</span>
                   </button>
                 ))}
               </div>
@@ -497,7 +503,7 @@ export function AspOptionsPanel({
         {kind === 'transform' && (
           <div className="asp-stack">
             <div>
-              <div className="asp-section-label">Aspect ratio</div>
+              <div className="asp-section-label">{t('editor.aspectRatio')}</div>
               <div className="asp-chip-row">
                 {aspectPresets.map((preset) => (
                   <button
@@ -508,7 +514,7 @@ export function AspOptionsPanel({
                     }`}
                     onClick={() => onSelectCrop?.(preset)}
                   >
-                    {preset === 'free' ? 'Free' : preset === 'original' ? 'Original' : preset}
+                    {preset === 'free' ? t('common.free') : preset === 'original' ? t('common.original') : preset}
                   </button>
                 ))}
                 {aspectRatios.map((option) => (
@@ -527,24 +533,23 @@ export function AspOptionsPanel({
             </div>
 
             <p className="asp-hint">
-              <AspIcon name="info" size={13} /> Drag the frame and its handles to choose the area
-              to keep, then Apply.
+              <AspIcon name="info" size={13} /> {t('panel.crop.hint')}
             </p>
             <div className="asp-btn-row">
               <button type="button" className="asp-btn-accent" onClick={() => onApplyCrop?.()}>
-                Apply crop
+                {t('panel.crop.apply')}
               </button>
               <button type="button" className="asp-btn-line" onClick={() => onCancelCrop?.()}>
-                Cancel
+                {t('common.cancel')}
               </button>
             </div>
             {hasCropRegion && (
               <button type="button" className="asp-btn-line" onClick={() => onResetCrop?.()}>
-                Reset crop
+                {t('panel.crop.reset')}
               </button>
             )}
 
-            <div className="asp-section-label asp-mt">Rotate &amp; flip</div>
+            <div className="asp-section-label asp-mt">{t('panel.crop.rotateFlip')}</div>
             <div className="asp-btn-row">
               <button type="button" className="asp-btn-line" onClick={() => onRotate?.(-90)}>
                 <AspIcon name="rotate-ccw" size={16} /> 90°
@@ -555,15 +560,15 @@ export function AspOptionsPanel({
             </div>
             <div className="asp-btn-row">
               <button type="button" className="asp-btn-line" onClick={() => onFlip?.('h')}>
-                <AspIcon name="flip-horizontal-2" size={16} /> Flip H
+                <AspIcon name="flip-horizontal-2" size={16} /> {t('panel.crop.flipH')}
               </button>
               <button type="button" className="asp-btn-line" onClick={() => onFlip?.('v')}>
-                <AspIcon name="flip-vertical-2" size={16} /> Flip V
+                <AspIcon name="flip-vertical-2" size={16} /> {t('panel.crop.flipV')}
               </button>
             </div>
             <div>
               <div className="asp-field-row">
-                <span className="asp-field-label">Straighten</span>
+                <span className="asp-field-label">{t('panel.crop.straighten')}</span>
                 <span className="asp-field-value">{straighten}°</span>
               </div>
               <input
@@ -576,7 +581,7 @@ export function AspOptionsPanel({
                 onPointerUp={(event) => onStraightenCommit?.(Number(event.currentTarget.value))}
                 onKeyUp={(event) => onStraightenCommit?.(Number(event.currentTarget.value))}
                 onBlur={(event) => onStraightenCommit?.(Number(event.currentTarget.value))}
-                aria-label="Straighten angle"
+                aria-label={t('panel.crop.straightenAngle')}
               />
             </div>
           </div>
@@ -589,12 +594,11 @@ export function AspOptionsPanel({
                 {!fromSelection && (
                   <>
                     <p className="asp-hint">
-                      <AspIcon name="info" size={13} /> Click anywhere on the canvas to add text,
-                      then type. Or add a labelled box below.
+                      <AspIcon name="info" size={13} /> {t('panel.text.hint')}
                     </p>
                     <div>
                       <label className="asp-field-label" htmlFor="asp-text-input">
-                        Text
+                        {t('panel.text.label')}
                       </label>
                       <div className="asp-text-add">
                         <input
@@ -604,7 +608,7 @@ export function AspOptionsPanel({
                           onChange={(event) => setTextValue(event.currentTarget.value)}
                         />
                         <button type="button" className="asp-btn-accent" onClick={handleAddText}>
-                          Add
+                          {t('common.add')}
                         </button>
                       </div>
                     </div>
@@ -614,11 +618,11 @@ export function AspOptionsPanel({
                   <div>
                     <div className="asp-field-row">
                       <label className="asp-field-label" htmlFor="asp-font-select">
-                        Font
+                        {t('panel.text.font')}
                       </label>
                       {fontLoading && (
                         <span className="asp-font-loading">
-                          <span className="asp-spinner" aria-hidden="true"></span> Loading…
+                          <span className="asp-spinner" aria-hidden="true"></span> {t('common.loading')}
                         </span>
                       )}
                     </div>
@@ -638,7 +642,7 @@ export function AspOptionsPanel({
                       <input
                         className="asp-input"
                         list={googleFontsListId}
-                        placeholder="Search Google fonts…"
+                        placeholder={t('panel.text.searchFonts')}
                         value={customFontValue}
                         onChange={(event) => setCustomFontValue(event.currentTarget.value)}
                         onKeyDown={(event) => {
@@ -646,7 +650,7 @@ export function AspOptionsPanel({
                             handleAddFont();
                           }
                         }}
-                        aria-label="Search and add a Google font"
+                        aria-label={t('panel.text.searchFontsAria')}
                       />
                       <datalist id={googleFontsListId}>
                         {googleFonts.map((name) => (
@@ -654,7 +658,7 @@ export function AspOptionsPanel({
                         ))}
                       </datalist>
                       <button type="button" className="asp-btn-line" onClick={handleAddFont}>
-                        Add
+                        {t('common.add')}
                       </button>
                     </div>
                   </div>
@@ -664,7 +668,7 @@ export function AspOptionsPanel({
                   <button
                     type="button"
                     className={`asp-icon-btn${textBold ? ' asp-icon-btn--on' : ''}`}
-                    title="Bold"
+                    title={t('panel.text.bold')}
                     onClick={() => onToggleBold?.()}
                   >
                     <AspIcon name="bold" size={16} />
@@ -672,7 +676,7 @@ export function AspOptionsPanel({
                   <button
                     type="button"
                     className={`asp-icon-btn${textItalic ? ' asp-icon-btn--on' : ''}`}
-                    title="Italic"
+                    title={t('panel.text.italic')}
                     onClick={() => onToggleItalic?.()}
                   >
                     <AspIcon name="italic" size={16} />
@@ -680,7 +684,7 @@ export function AspOptionsPanel({
                   <button
                     type="button"
                     className={`asp-icon-btn${textUnderline ? ' asp-icon-btn--on' : ''}`}
-                    title="Underline"
+                    title={t('panel.text.underline')}
                     onClick={() => onToggleUnderline?.()}
                   >
                     <AspIcon name="underline" size={16} />
@@ -688,7 +692,7 @@ export function AspOptionsPanel({
                   <button
                     type="button"
                     className={`asp-icon-btn${textStrike ? ' asp-icon-btn--on' : ''}`}
-                    title="Strikethrough"
+                    title={t('panel.text.strikethrough')}
                     onClick={() => onToggleStrike?.()}
                   >
                     <AspIcon name="strikethrough" size={16} />
@@ -698,7 +702,7 @@ export function AspOptionsPanel({
                   <button
                     type="button"
                     className={`asp-icon-btn${textAlign === 'left' ? ' asp-icon-btn--on' : ''}`}
-                    title="Align left"
+                    title={t('panel.text.alignLeft')}
                     onClick={() => onTextAlignChange?.('left')}
                   >
                     <AspIcon name="align-left" size={16} />
@@ -706,7 +710,7 @@ export function AspOptionsPanel({
                   <button
                     type="button"
                     className={`asp-icon-btn${textAlign === 'center' ? ' asp-icon-btn--on' : ''}`}
-                    title="Align center"
+                    title={t('panel.text.alignCenter')}
                     onClick={() => onTextAlignChange?.('center')}
                   >
                     <AspIcon name="align-center" size={16} />
@@ -714,7 +718,7 @@ export function AspOptionsPanel({
                   <button
                     type="button"
                     className={`asp-icon-btn${textAlign === 'right' ? ' asp-icon-btn--on' : ''}`}
-                    title="Align right"
+                    title={t('panel.text.alignRight')}
                     onClick={() => onTextAlignChange?.('right')}
                   >
                     <AspIcon name="align-right" size={16} />
@@ -722,7 +726,7 @@ export function AspOptionsPanel({
                 </div>
                 <div>
                   <div className="asp-field-row">
-                    <span className="asp-field-label">Line height</span>
+                    <span className="asp-field-label">{t('panel.text.lineHeight')}</span>
                     <span className="asp-field-value">{lineHeight.toFixed(2)}</span>
                   </div>
                   <input
@@ -734,12 +738,12 @@ export function AspOptionsPanel({
                     onChange={(event) =>
                       onLineHeightChange?.(Number(event.currentTarget.value) / 100)
                     }
-                    aria-label="Line height"
+                    aria-label={t('panel.text.lineHeight')}
                   />
                 </div>
                 <div>
                   <div className="asp-field-row">
-                    <span className="asp-field-label">Letter spacing</span>
+                    <span className="asp-field-label">{t('panel.text.letterSpacing')}</span>
                     <span className="asp-field-value">{letterSpacing}</span>
                   </div>
                   <input
@@ -749,11 +753,11 @@ export function AspOptionsPanel({
                     max={800}
                     value={letterSpacing}
                     onChange={(event) => onLetterSpacingChange?.(Number(event.currentTarget.value))}
-                    aria-label="Letter spacing"
+                    aria-label={t('panel.text.letterSpacing')}
                   />
                 </div>
                 <div>
-                  <span className="asp-field-label">Text background</span>
+                  <span className="asp-field-label">{t('panel.text.background')}</span>
                   <div className="asp-mt">
                     <AspColorField
                       colors={FILL_COLORS}
@@ -766,7 +770,7 @@ export function AspOptionsPanel({
             )}
 
             <div>
-              <span className="asp-field-label">{isText ? 'Text color' : 'Color'}</span>
+              <span className="asp-field-label">{isText ? t('panel.draw.textColor') : t('panel.draw.color')}</span>
               <div className="asp-mt">
                 <AspColorField
                   colors={ANNOTATION_COLORS}
@@ -778,7 +782,7 @@ export function AspOptionsPanel({
 
             {isShape && (
               <div>
-                <span className="asp-field-label">Fill</span>
+                <span className="asp-field-label">{t('panel.draw.fill')}</span>
                 <div className="asp-mt">
                   <AspColorField
                     colors={FILL_COLORS}
@@ -811,7 +815,7 @@ export function AspOptionsPanel({
             {showCornerRadius && (
               <div>
                 <div className="asp-field-row">
-                  <span className="asp-field-label">Corner radius</span>
+                  <span className="asp-field-label">{t('panel.draw.cornerRadius')}</span>
                   <span className="asp-field-value">{cornerRadius} px</span>
                 </div>
                 <input
@@ -824,7 +828,7 @@ export function AspOptionsPanel({
                   onPointerUp={(event) => onCornerRadiusCommit?.(Number(event.currentTarget.value))}
                   onKeyUp={(event) => onCornerRadiusCommit?.(Number(event.currentTarget.value))}
                   onBlur={(event) => onCornerRadiusCommit?.(Number(event.currentTarget.value))}
-                  aria-label="Corner radius"
+                  aria-label={t('panel.draw.cornerRadius')}
                 />
               </div>
             )}
@@ -834,7 +838,7 @@ export function AspOptionsPanel({
                 <button
                   type="button"
                   className="asp-icon-btn"
-                  title="Rectangle"
+                  title={t('panel.shape.rectangle')}
                   onClick={() => onAddShape?.('rect')}
                 >
                   <AspIcon name="square" size={17} />
@@ -842,7 +846,7 @@ export function AspOptionsPanel({
                 <button
                   type="button"
                   className="asp-icon-btn"
-                  title="Ellipse"
+                  title={t('panel.shape.ellipse')}
                   onClick={() => onAddShape?.('ellipse')}
                 >
                   <AspIcon name="circle" size={17} />
@@ -850,7 +854,7 @@ export function AspOptionsPanel({
                 <button
                   type="button"
                   className="asp-icon-btn"
-                  title="Triangle"
+                  title={t('panel.shape.triangle')}
                   onClick={() => onAddShape?.('triangle')}
                 >
                   <AspIcon name="triangle" size={17} />
@@ -858,7 +862,7 @@ export function AspOptionsPanel({
                 <button
                   type="button"
                   className="asp-icon-btn"
-                  title="Diamond"
+                  title={t('panel.shape.diamond')}
                   onClick={() => onAddShape?.('diamond')}
                 >
                   <AspIcon name="diamond" size={17} />
@@ -866,7 +870,7 @@ export function AspOptionsPanel({
                 <button
                   type="button"
                   className="asp-icon-btn"
-                  title="Pentagon"
+                  title={t('panel.shape.pentagon')}
                   onClick={() => onAddShape?.('pentagon')}
                 >
                   <AspIcon name="pentagon" size={17} />
@@ -874,7 +878,7 @@ export function AspOptionsPanel({
                 <button
                   type="button"
                   className="asp-icon-btn"
-                  title="Hexagon"
+                  title={t('panel.shape.hexagon')}
                   onClick={() => onAddShape?.('hexagon')}
                 >
                   <AspIcon name="hexagon" size={17} />
@@ -882,7 +886,7 @@ export function AspOptionsPanel({
                 <button
                   type="button"
                   className="asp-icon-btn"
-                  title="Star"
+                  title={t('panel.shape.star')}
                   onClick={() => onAddShape?.('star')}
                 >
                   <AspIcon name="star" size={17} />
@@ -890,7 +894,7 @@ export function AspOptionsPanel({
                 <button
                   type="button"
                   className="asp-icon-btn"
-                  title="Line"
+                  title={t('panel.shape.line')}
                   onClick={() => onAddShape?.('line')}
                 >
                   <AspIcon name="minus" size={17} />
@@ -898,7 +902,7 @@ export function AspOptionsPanel({
                 <button
                   type="button"
                   className="asp-icon-btn"
-                  title="Arrow"
+                  title={t('panel.shape.arrow')}
                   onClick={() => onAddShape?.('arrow')}
                 >
                   <AspIcon name="arrow-up-right" size={17} />
@@ -914,21 +918,21 @@ export function AspOptionsPanel({
                     className={`asp-chip${redactMode === 'blur' ? ' asp-chip--active' : ''}`}
                     onClick={() => onRedactModeChange?.('blur')}
                   >
-                    Blur
+                    {t('panel.redact.blur')}
                   </button>
                   <button
                     type="button"
                     className={`asp-chip${redactMode === 'pixelate' ? ' asp-chip--active' : ''}`}
                     onClick={() => onRedactModeChange?.('pixelate')}
                   >
-                    Pixelate
+                    {t('panel.redact.pixelate')}
                   </button>
                   <button
                     type="button"
                     className={`asp-chip${redactMode === 'solid' ? ' asp-chip--active' : ''}`}
                     onClick={() => onRedactModeChange?.('solid')}
                   >
-                    Solid
+                    {t('panel.redact.solid')}
                   </button>
                 </div>
                 <button
@@ -936,7 +940,7 @@ export function AspOptionsPanel({
                   className="asp-btn-accent asp-redact-apply"
                   onClick={() => onApplyRedaction?.()}
                 >
-                  Apply redaction
+                  {t('panel.redact.apply')}
                 </button>
               </>
             )}
@@ -945,20 +949,18 @@ export function AspOptionsPanel({
               <AspIcon name="info" size={13} />{' '}
               {fromSelection ? (
                 <>
-                  Editing the selected {isText ? 'text' : 'object'}. Adjust its properties here;
-                  use the Layers panel to reorder or delete.
+                  {isText ? t('panel.hint.editingText') : t('panel.hint.editingObject')}
                 </>
               ) : isShape ? (
-                <>Pick a shape to drop it on the canvas, then drag to position or resize.</>
+                <>{t('panel.hint.shape')}</>
               ) : isRedact ? (
                 <>
-                  Position the box over the area, then Apply to conceal it. After applying, click
-                  the canvas to place another box.
+                  {t('panel.hint.redact')}
                 </>
               ) : isText ? (
-                <>Click the canvas to add text and edit in place. Double-click later to re-edit.</>
+                <>{t('panel.hint.text')}</>
               ) : (
-                <>Draw directly on the canvas. Manage objects in the Layers panel.</>
+                <>{t('panel.hint.draw')}</>
               )}
             </p>
           </div>
@@ -976,12 +978,12 @@ export function AspOptionsPanel({
                   }`}
                   onClick={() => onSelectFrame?.(frame.key)}
                 >
-                  {frame.label}
+                  {t(`frames.${frame.key}`, { defaultValue: frame.label })}
                 </button>
               ))}
             </div>
             <div>
-              <span className="asp-field-label">Frame color</span>
+              <span className="asp-field-label">{t('panel.frame.color')}</span>
               <div className="asp-mt">
                 <AspColorField
                   colors={ANNOTATION_COLORS}
@@ -996,14 +998,14 @@ export function AspOptionsPanel({
         {kind === 'background' && (
           <div className="asp-stack">
             <div>
-              <div className="asp-section-label">Output size</div>
+              <div className="asp-section-label">{t('panel.canvas.outputSize')}</div>
               <div className="asp-chip-row">
                 <button
                   type="button"
                   className={`asp-chip${artboard === null ? ' asp-chip--active' : ''}`}
                   onClick={() => onArtboardChange?.(null)}
                 >
-                  Full canvas
+                  {t('panel.canvas.fullCanvas')}
                 </button>
                 {ARTBOARD_PRESETS.map((preset) => (
                   <button
@@ -1012,7 +1014,7 @@ export function AspOptionsPanel({
                     className={`asp-chip${isArtboardActive(preset.size) ? ' asp-chip--active' : ''}`}
                     onClick={() => onArtboardChange?.(preset.size)}
                   >
-                    {preset.label}
+                    {preset.key ? t(`presets.${preset.key}`, { defaultValue: preset.label }) : preset.label}
                   </button>
                 ))}
               </div>
@@ -1022,7 +1024,7 @@ export function AspOptionsPanel({
                   className="asp-dim-input"
                   min={1}
                   max={10000}
-                  aria-label="Output width in pixels"
+                  aria-label={t('panel.canvas.widthAria')}
                   value={customW}
                   onChange={(event) => setCustomW(event.currentTarget.value)}
                 />
@@ -1032,17 +1034,17 @@ export function AspOptionsPanel({
                   className="asp-dim-input"
                   min={1}
                   max={10000}
-                  aria-label="Output height in pixels"
+                  aria-label={t('panel.canvas.heightAria')}
                   value={customH}
                   onChange={(event) => setCustomH(event.currentTarget.value)}
                 />
                 <button type="button" className="asp-btn-line" onClick={applyCustomArtboard}>
-                  Set
+                  {t('common.set')}
                 </button>
               </div>
             </div>
             <div>
-              <div className="asp-section-label">Color</div>
+              <div className="asp-section-label">{t('panel.canvas.color')}</div>
               <AspColorField
                 colors={BACKGROUND_COLORS}
                 value=""
@@ -1050,7 +1052,7 @@ export function AspOptionsPanel({
               />
             </div>
             <div>
-              <div className="asp-section-label">Gradient</div>
+              <div className="asp-section-label">{t('panel.canvas.gradient')}</div>
               <div className="asp-chip-row">
                 {BACKGROUND_GRADIENTS.map((gradient) => (
                   <button
@@ -1059,15 +1061,15 @@ export function AspOptionsPanel({
                     className="asp-chip"
                     onClick={() => onSetBackgroundGradient?.(gradient.colors)}
                   >
-                    {gradient.label}
+                    {gradient.key ? t(`gradients.${gradient.key}`, { defaultValue: gradient.label }) : gradient.label}
                   </button>
                 ))}
               </div>
             </div>
             <div>
-              <div className="asp-section-label">Image</div>
+              <div className="asp-section-label">{t('panel.canvas.image')}</div>
               <label className="asp-upload">
-                <AspIcon name="image-plus" size={15} /> Upload background image
+                <AspIcon name="image-plus" size={15} /> {t('panel.canvas.uploadImage')}
                 <input type="file" accept="image/*" onChange={handleBackgroundImage} />
               </label>
             </div>
@@ -1077,9 +1079,7 @@ export function AspOptionsPanel({
         {kind === 'ai' && (
           <div className="asp-stack">
             <p className="asp-hint">
-              <AspIcon name="info" size={13} /> {aiActionLabel} runs an AI model entirely in your
-              browser — no upload. The model (~tens of MB) downloads once on first use, then is
-              cached.
+              <AspIcon name="info" size={13} /> {t('panel.ai.hint', { action: aiActionLabel })}
             </p>
             <button
               type="button"
@@ -1087,13 +1087,13 @@ export function AspOptionsPanel({
               disabled={aiBusy}
               onClick={() => onRunAi?.()}
             >
-              {aiBusy ? 'Working…' : aiActionLabel}
+              {aiBusy ? t('panel.ai.working') : aiActionLabel}
             </button>
             {aiBusy && (
               <div>
                 <div className="asp-field-row">
                   <span className="asp-field-label">
-                    {aiStage === 'loading' ? 'Downloading model…' : 'Processing…'}
+                    {aiStage === 'loading' ? t('panel.ai.downloading') : t('panel.ai.processing')}
                   </span>
                   <span className="asp-field-value">{aiPercent}%</span>
                 </div>
@@ -1108,13 +1108,11 @@ export function AspOptionsPanel({
         {kind === 'magic' && (
           <div className="asp-stack">
             <p className="asp-hint">
-              <AspIcon name="info" size={13} /> Click a color region on the image to erase it
-              (e.g. a solid background). Raise the tolerance to catch more shades; undo if it
-              grabs too much.
+              <AspIcon name="info" size={13} /> {t('panel.magic.hint')}
             </p>
             <div>
               <div className="asp-field-row">
-                <span className="asp-field-label">Tolerance</span>
+                <span className="asp-field-label">{t('panel.magic.tolerance')}</span>
                 <span className="asp-field-value">{magicTolerance}</span>
               </div>
               <input
@@ -1124,7 +1122,7 @@ export function AspOptionsPanel({
                 max={100}
                 value={magicTolerance}
                 onChange={(event) => onMagicToleranceChange?.(Number(event.currentTarget.value))}
-                aria-label="Magic wand tolerance"
+                aria-label={t('panel.magic.toleranceAria')}
               />
             </div>
           </div>
@@ -1132,13 +1130,11 @@ export function AspOptionsPanel({
 
         {kind === 'select' && (
           <p className="asp-hint">
-            <AspIcon name="info" size={13} /> Click an object on the canvas to select it. Use the
-            Layers panel to lock, reorder, group, align, or change opacity. Shift-click to
-            multi-select.
+            <AspIcon name="info" size={13} /> {t('panel.select.hint')}
           </p>
         )}
 
-        {kind === 'none' && <p className="asp-hint">Select a tool to see its options.</p>}
+        {kind === 'none' && <p className="asp-hint">{t('panel.none.hint')}</p>}
       </div>
     </div>
   );
