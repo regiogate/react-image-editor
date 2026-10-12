@@ -5,7 +5,7 @@ export const de: AspMessages = {
   common: {
     cancel: "Abbrechen",
     close: "Schließen",
-    save: "Speichern",
+    save: "Übernehmen",
     add: "Hinzufügen",
     set: "Setzen",
     reset: "Zurücksetzen",
